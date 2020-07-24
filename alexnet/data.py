@@ -29,6 +29,8 @@ class Data:
     Dataset options: CIFAR10, CIFAR100, MNIST
 
     TODO Add more datasets
+    TODO Add necessary data transformations 
+    ----- TODO TenCrop and PCA transformations for AlexNet
     """
     def __get_this_dataset(self, dataset_name, download):
         dataset_train = None
@@ -47,3 +49,7 @@ class Data:
             dataset_test = torchvision.datasets.MNIST(root='./', train=False, download=download)
 
         return dataset_train, dataset_test
+
+
+
+#print(len(torchvision.datasets.CIFAR10(root='./', train=True, download=True, transform=torchvision.transforms.TenCrop(60))))
