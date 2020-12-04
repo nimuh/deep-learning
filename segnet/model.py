@@ -1,39 +1,52 @@
-# -*- coding: utf-8 -*-
 import random
 import torch
 import torchvision
+import torch.nn.functional as F
 
 
 class SegNet(torch.nn.Module):
-    def __init__(self):
-        """
-        In the constructor we construct three nn.Linear instances that we will use
-        in the forward pass.
-        """
+    def __init__(self, input_size, output_size):
         super(SegNet, self).__init__()
-        self.input_linear = torch.nn.Linear(100, 50)
-        self.middle_linear = torch.nn.Linear(50, 50)
-        self.output_linear = torch.nn.Linear(50, 25)
 
+        # SegNet Basic Architecture
+        self.conv1 = self.__enc_conv_module(input_size, 64, 3, 1)
+        self.conv2 = self.__enc_conv_module(64, 128, 3, 1)
+        self.conv3 = self.__enc_conv_module(128, 256, 3, 1)
+        self.conv4 = self.__enc_conv_module(256, 512, 3, 1)
+
+        self.deconv4 = self.__dec_conv_module(512, 256, 3, 1)
+        self.deconv3 = self.__dec_conv_module(256, 128, 3, 1)
+        self.deconv2 = self.__dec_conv_module(128, 64, 3, 1)
+
+
+    """
+    Represents module in SegNet for convolution
+    """
+    def __enc_conv_module(self, in_channels, out_channels, kernel_size, pad):
+        module = torch.nn.Sequential(torch.nn.Conv2d(in_channels=in_channels, 
+                                                     out_channels=out_channels,
+                                                     kernel_size=kernel_size,
+                                                     padding=pad,
+                                                     ),
+                                     torch.nn.BatchNorm2d(out_channels),                 
+                                )
+        return module
+
+    def __dec_conv_module(self, in_channels, out_channels, kernel_size, pad):
+        module = torch.nn.Sequential(torch.nn.ConvTranspose2d(in_channels=in_channels,
+                                                              out_channels=out_channels,
+                                                              kernel_size=kernel_size,
+                                                              padding=pad,
+                                                              ),
+                                     torch.nn.BatchNorm2d(out_channels),
+                                    )
+        return module
+
+
+
+    """
+    Forward pass for inference
+    """
     def forward(self, x):
-        """
-        For the forward pass of the model, we randomly choose either 0, 1, 2, or 3
-        and reuse the middle_linear Module that many times to compute hidden layer
-        representations.
+        pass
 
-        Since each forward pass builds a dynamic computation graph, we can use normal
-        Python control-flow operators like loops or conditional statements when
-        defining the forward pass of the model.
-
-        Here we also see that it is perfectly safe to reuse the same Module many
-        times when defining a computational graph. This is a big improvement from Lua
-        Torch, where each Module could be used only once.
-        """
-        h_relu = self.input_linear(x).clamp(min=0)
-        for _ in range(random.randint(0, 3)):
-            h_relu = self.middle_linear(h_relu).clamp(min=0)
-        y_pred = self.output_linear(h_relu)
-        return y_pred
-
-
-torchvision.models.vgg16()
