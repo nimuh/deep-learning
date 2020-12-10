@@ -6,55 +6,50 @@ import torch.nn.functional as F
 
 class SegNet(torch.nn.Module):
 
-    def __init__(self, input_size, output_size):
+    def __init__(self, input_ch, output_ch):
         super(SegNet, self).__init__()
 
-        # SegNet Basic Architecture
-        self.conv11 = self.__enc_conv_module(input_size, 64, 3, 1)
+        # SegNet Architecture
+        self.conv11 = self.__enc_conv_module(input_ch, 64, 3, 1)
         self.conv12 = self.__enc_conv_module(64, 64, 3, 1)
-        #self.pool1 = torch.nn.MaxPool2d(2, stride=2, return_indices=True)
+        self.pool1 = torch.nn.MaxPool2d(kernel_size=2, stride=2, return_indices=True)
 
         self.conv21 = self.__enc_conv_module(64, 128, 3, 1)
         self.conv22 = self.__enc_conv_module(128, 128, 3, 1)
-        #self.pool2 = torch.nn.MaxPool2d(2, stride=2, return_indices=True)
+        self.pool2 = torch.nn.MaxPool2d(kernel_size=2, stride=2, return_indices=True)
 
         self.conv31 = self.__enc_conv_module(128, 256, 3, 1)
         self.conv32 = self.__enc_conv_module(256, 256, 3, 1)
         self.conv33 = self.__enc_conv_module(256, 256, 3, 1)
-        #self.pool3 = torch.nn.MaxPool2d(2, stride=2, return_indices=True)
+        self.pool3 = torch.nn.MaxPool2d(kernel_size=2, stride=2, return_indices=True)
 
         self.conv41 = self.__enc_conv_module(256, 512, 3, 1)
         self.conv42 = self.__enc_conv_module(512, 512, 3, 1)
         self.conv43 = self.__enc_conv_module(512, 512, 3, 1)
-        #self.pool4 = torch.nn.MaxPool2d(2, stride=2, return_indices=True)
+        self.pool4 = torch.nn.MaxPool2d(kernel_size=2, stride=2, return_indices=True)
 
         self.conv51 = self.__enc_conv_module(512, 1024, 3, 1)
         self.conv52 = self.__enc_conv_module(1024, 1024, 3, 1)
         self.conv53 = self.__enc_conv_module(1024, 1024, 3, 1)
-        #self.pool5 = torch.nn.MaxPool2d(2, stride=2, return_indices=True)
+        self.pool5 = torch.nn.MaxPool2d(kernel_size=2, stride=2, return_indices=True)
 
-        #self.pool6 = torch.nn.MaxUnpool2d
         self.deconv51 = self.__dec_conv_module(1024, 1024, 3, 1)
         self.deconv52 = self.__dec_conv_module(1024, 1024, 3, 1)
-        self.deconv53 = self.__dec_conv_module(1024, 1024, 3, 1)
+        self.deconv53 = self.__dec_conv_module(1024, 512, 3, 1)
 
-        #self.pool7 = torch.nn.MaxUnpool2d
-        self.deconv41 = self.__dec_conv_module(1024, 512, 3, 1)
+        self.deconv41 = self.__dec_conv_module(512, 512, 3, 1)
         self.deconv42 = self.__dec_conv_module(512, 512, 3, 1)
-        self.deconv43 = self.__dec_conv_module(512, 512, 3, 1)
+        self.deconv43 = self.__dec_conv_module(512, 256, 3, 1)
 
-        #self.pool8 = torch.nn.MaxUnpool2d
-        self.deconv31 = self.__dec_conv_module(512, 256, 3, 1)
+        self.deconv31 = self.__dec_conv_module(256, 256, 3, 1)
         self.deconv32 = self.__dec_conv_module(256, 256, 3, 1)
-        self.deconv33 = self.__dec_conv_module(256, 256, 3, 1)
+        self.deconv33 = self.__dec_conv_module(256, 128, 3, 1)
 
-        #self.pool9 = torch.nn.MaxUnpool2d
-        self.deconv21 = self.__dec_conv_module(256, 128, 3, 1)
-        self.deconv22 = self.__dec_conv_module(128, 128, 3, 1)
+        self.deconv21 = self.__dec_conv_module(128, 128, 3, 1)
+        self.deconv22 = self.__dec_conv_module(128, 64, 3, 1)
 
-        #self.pool10 = torch.nn.MaxUnpool2d
-        self.deconv11 = self.__dec_conv_module(128, 64, 3, 1)
-        self.deconv12 = self.__dec_conv_module(64, output_size, 3, 1)
+        self.deconv11 = self.__dec_conv_module(64, 64, 3, 1)
+        self.deconv12 = self.__dec_conv_module(64, output_ch, 3, 1)
 
 
     """
@@ -84,7 +79,6 @@ class SegNet(torch.nn.Module):
 
     """
     Forward pass for inference
-    TODO Define segnet architecture from paper
     """
     def forward(self, x):
         # ENCODER
@@ -92,59 +86,59 @@ class SegNet(torch.nn.Module):
         dim_1 = x.size()
         z = F.relu(self.conv11(x))
         z = F.relu(self.conv12(z))
-        #z, idx_1 = self.pool1(z)
+        z, idx_1 = self.pool1(z)
 
         dim_2 = z.size()
         z = F.relu(self.conv21(z))
         z = F.relu(self.conv22(z))
-        #z, idx_2 = self.pool2(z)
+        z, idx_2 = self.pool2(z)
 
         dim_3 = z.size()
         z = F.relu(self.conv31(z))
         z = F.relu(self.conv32(z))
-        #z = F.relu(self.conv33(z))
-        #z, idx_3 = self.pool3(z)
+        z = F.relu(self.conv33(z))
+        z, idx_3 = self.pool3(z)
 
         dim_4 = z.size()
         z = F.relu(self.conv41(z))
         z = F.relu(self.conv42(z))
-        #z = F.relu(self.conv43(z))
-        #z, idx_4 = self.pool4(z)
+        z = F.relu(self.conv43(z))
+        z, idx_4 = self.pool4(z)
 
         dim_5 = z.size()
         z = F.relu(self.conv51(z))
         z = F.relu(self.conv52(z))
-        #z = F.relu(self.conv53(z))
-        #z, idx_5 = self.pool5(z)
+        z = F.relu(self.conv53(z))
+        z, idx_5 = self.pool5(z)
         ########################################################################
 
         # DECODER
         ########################################################################
-        #z = self.pool6(z, idx_5, kernel_size=2, stride=2, output_size=dim_5)
+        z = F.max_unpool2d(z, idx_5, kernel_size=2, stride=2, output_size=dim_5)
         z = self.deconv51(z)
         z = self.deconv52(z)
-        #z = self.deconv53(z)
+        z = self.deconv53(z)
 
-        #z = self.pool7(z, idx_4, kernel_size=2, stride=2, output_size=dim_4)
+        z = F.max_unpool2d(z, idx_4, kernel_size=2, stride=2, output_size=dim_4)
         z = self.deconv41(z)
         z = self.deconv42(z)
-        #z = self.deconv43(z)
+        z = self.deconv43(z)
 
-        #z = self.pool8(z, idx_3, kernel_size=2, stride=2, output_size=dim_3)
+        z = F.max_unpool2d(z, idx_3, kernel_size=2, stride=2, output_size=dim_3)
         z = self.deconv31(z)
         z = self.deconv32(z)
-        #z = self.deconv33(z)
+        z = self.deconv33(z)
 
-        #z = self.pool9(z, idx_2, kernel_size=2, stride=2, output_size=dim_2)
+        z = F.max_unpool2d(z, idx_2, kernel_size=2, stride=2, output_size=dim_2)
         z = self.deconv21(z)
         z = self.deconv22(z)
 
-        #z = self.pool10(z, idx_1, kernel_size=2, stride=2, output_size=dim_1)
+        z = F.max_unpool2d(z, idx_1, kernel_size=2, stride=2, output_size=dim_1)
         z = self.deconv11(z)
         z = self.deconv12(z)
-        return z
-        #out_softmax = F.softmax(z, dim=1)
+
+        out_softmax = F.softmax(z, dim=1)
         ########################################################################
 
-        #return out_softmax
+        return z, out_softmax
 
