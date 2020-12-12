@@ -2,6 +2,37 @@ import random
 import torch
 import torchvision
 import torch.nn.functional as F
+import numpy as np
+
+
+class DataLabels():
+    def __init__(self, class_dict):
+        self.color2label = class_dict
+
+    def get_label(self, color):
+        return self.color2label(tuple(color))
+
+    def label_batch(self, batch):
+        curr_batch =  batch.numpy()
+        curr_batch = curr_batch.reshape( (curr_batch.shape[0], 
+                                          curr_batch.shape[2],
+                                          curr_batch.shape[3],
+                                          curr_batch.shape[1]) )
+
+        labels = np.zeros( (batch.size()[0],
+                            batch.size()[2],
+                            batch.size()[3]) )
+
+        for b in range(batch.size()[0]):
+            for i in range(batch.size()[1]):
+                for j in range(batch.size()[2]):
+                    try:
+                        labels[b][i][j] = self.get_label(curr_batch[b][i][j])
+                    except:
+                        labels[b][i][j] = 0
+
+        return torch.from_numpy(labels).type(torch.int64)
+
 
 
 class SegNet(torch.nn.Module):
