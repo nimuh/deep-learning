@@ -6,45 +6,6 @@ import numpy as np
 
 
 """
-Class for converting masks to labels for training.
-"""
-class DataLabels:
-    """
-    Init with dictionary mapping from tuples to integers
-    """
-    def __init__(self, class_dict):
-        self.color2label = class_dict
-
-    def get_label(self, color):
-        return self.color2label(tuple(color))
-
-    """
-    Label a batch of masks.
-    """
-    def label_batch(self, batch):
-        curr_batch =  batch.numpy()
-        curr_batch = curr_batch.reshape( (curr_batch.shape[0], 
-                                          curr_batch.shape[2],
-                                          curr_batch.shape[3],
-                                          curr_batch.shape[1]) )
-
-        labels = np.zeros( (batch.size()[0],
-                            batch.size()[2],
-                            batch.size()[3]) )
-
-        for b in range(batch.size()[0]):
-            for i in range(batch.size()[1]):
-                for j in range(batch.size()[2]):
-                    try:
-                        labels[b][i][j] = self.get_label(curr_batch[b][i][j])
-                    except:
-                        labels[b][i][j] = 0
-
-        return torch.from_numpy(labels).type(torch.int64)
-
-
-
-"""
 SegNet model as defined in paper. Consists of 5 encoder layers and 5 decoder layers.
 The decoder layers receive max poolingn indices from the encoder. The output is an image
 with the number of channels equal to the number of classes we are predicting.

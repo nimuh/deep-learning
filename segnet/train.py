@@ -3,7 +3,7 @@ from torch.autograd import Variable
 import random
 from torchvision.datasets import Cityscapes
 from torchvision import transforms
-from model import SegNet, DataLabels
+from model import SegNet
 from torch.utils.data import DataLoader
 import wandb
 import sys
@@ -11,32 +11,10 @@ import numpy as np
 from sklearn.metrics import jaccard_score as jsc
 
 IN_CHANNELS = 3
-gpu = False
-monitor = False
-
-# dictionary for mapping masks to labels
-color2label = {(0, 0, 0):       0,
-               (111, 74,  0):   5,
-               (81,  0, 81):    6,
-               (128, 64, 128):  7,
-               (244, 35, 232):  8,
-               (250, 170, 160): 9,
-               (230, 150, 140): 10,
-               (70, 70, 70):    11,
-               (102, 102, 156): 12,
-               (190, 153, 153): 13,
-               (180, 165, 180): 14,
-               (150, 100, 100): 15,
-               (150, 120, 90):  16,
-               (153, 153, 153): 17,
-               (250, 170, 30):  19,
-               (220, 220, 0):   20,
-               (0, 0, 142):     21,
-              }
-
 CLASSES = 34
 
-labeler = DataLabels(color2label)
+gpu = False
+monitor = False
 
 if len(sys.argv) > 1 and sys.argv[1] == 'gpu':
     print("GPU: ", torch.cuda.is_available())
@@ -46,7 +24,7 @@ if len(sys.argv) == 3 and sys.argv[2] == 'monitor':
     wandb.init(project='segnet')
     monitor = True
 
-EPOCHS = 100
+EPOCHS = 500
 LR = 1e-4
 BATCH_SIZE = 16
 print("----INIT TRAIN SCRIPT----")
@@ -69,9 +47,28 @@ out_t = transforms.Compose([
             transforms.functional.pil_to_tensor,
         ])
 
-data = Cityscapes('./data', target_type=['semantic'], transform=in_t, target_transform=out_t)
+tr_data = Cityscapes('./data', 
+                     target_type=['semantic'], 
+                     split='train', 
+                     transform=in_t, 
+                     target_transform=out_t,
+                    )
+v_data = Cityscapes('./data', 
+                     target_type=['semantic'], 
+                     split='val', 
+                     transform=in_t, 
+                     target_transform=out_t,
+                    )
+#te_data = Cityscapes('./data', 
+ #                    target_type=['semantic'], 
+  #                   split='test', 
+   #                  transform=in_t, 
+    #                 target_transform=out_t,
+     #               )
 
-train_data = DataLoader(data, batch_size=BATCH_SIZE, shuffle=True)
+train_data = DataLoader(tr_data, batch_size=BATCH_SIZE, shuffle=True)
+val_data = DataLoader(v_data, batch_size=BATCH_SIZE, shuffle=False)
+#test_data = DataLoader(te_data, batch_size=BATCH_SIZE, shuffle=False)
 
 # define model
 model = SegNet(IN_CHANNELS, CLASSES)
@@ -84,16 +81,23 @@ if monitor:
 
 # optimizer and loss definition
 criterion = torch.nn.CrossEntropyLoss().cuda()
-#optimizer = torch.optim.Adam(model.parameters(), lr=LR)
 optimizer = torch.optim.SGD(model.parameters(), lr=LR, momentum=0.9)
 
 # training
 for epoch in range(EPOCHS):
-    epoch_loss = 0
+
+    tr_epoch_loss = 0
+    tr_epoch_iou = 0
+    tr_batch_count = 0
+    val_batch_count = 0 
+    val_epoch_loss = 0
+    val_epoch_iou = 0
+
     print('-------- EPOCH {} -------'.format(epoch))
-    batch_count = 0
-    epoch_iou = 0
-    for i, (inputs, targets) in enumerate(train_data, 0):    
+
+    # TRAINING
+    for i, (inputs, targets) in enumerate(train_data, 0):
+
         labels = targets.squeeze(1).type(torch.int64)
         
         if gpu:
@@ -102,34 +106,74 @@ for epoch in range(EPOCHS):
 
         logits, y_pred = model(inputs)
 
-        # Compute and print loss
-        loss = criterion(logits, labels)
+        batch_iou = jsc(
+            labels.cpu().numpy().reshape(-1),
+            torch.argmax(y_pred, dim=1).cpu().numpy().reshape(-1),
+            average='macro',
+        )
+
+        tr_epoch_iou += batch_iou
+        tr_batch_count += 1
+
+        # Zero gradients, perform a backward pass, and update the weights.
+        optimizer.zero_grad()
+        tr_loss = criterion(logits, labels)
+        tr_epoch_loss += tr_loss.item()
+        print("----- BATCH: {} TRAIN LOSS: {}".format(i, tr_loss.item()))
+
+        # backprop
+        tr_loss.backward()
+        optimizer.step()
+
+    # VALIDATION
+    for i, (inputs, targets) in enumerate(val_data, 0):
+
+        labels = targets.squeeze(1).type(torch.int64)
+        
+        if gpu:
+            inputs = inputs.cuda()
+            labels = labels.cuda()
+
+        logits, y_pred = model(inputs)
 
         batch_iou = jsc(
             labels.cpu().numpy().reshape(-1),
             torch.argmax(y_pred, dim=1).cpu().numpy().reshape(-1),
             average='macro',
         )
-        epoch_iou += batch_iou
+
+        val_epoch_iou += batch_iou
         
-        batch_count += 1
-        epoch_loss += loss.item()
+        val_batch_count += 1
+        val_loss = criterion(logits, labels)
+        val_epoch_loss += val_loss.item()
+       
+        print("----- BATCH: {} VAL LOSS: {}".format(i, val_loss.item()))
 
-        # Zero gradients, perform a backward pass, and update the weights.
-        optimizer.zero_grad()
-        loss = criterion(logits, labels)
-        print("----- BATCH: {} LOSS: {}".format(i, loss.item()))
+    # UPDATE GRAPHS FOR TRAINING AND VALIDATION
+    TR_LOSS = tr_epoch_loss / len(train_data)
+    TR_IOU = tr_epoch_iou / len(train_data)
+    VAL_LOSS = val_epoch_loss / len(val_data)
+    VAL_IOU = val_epoch_iou / len(val_data)
 
-        if monitor:
-            wandb.log({"loss": loss.item(),
-                    "IoU": batch_iou,
+    if monitor:
+            wandb.log({"training loss": TR_LOSS,
+                       "training IoU": TR_IOU,
+                       "validation loss": VAL_LOSS,
+                       "validaton IoU": VAL_IOU,
                     })
 
-        loss.backward()
-        optimizer.step()
-
     print('---------------------------')
-    print("EPOCH: {} LOSS: {} IoU: {}".format(epoch, epoch_loss / batch_count, epoch_iou / batch_count))
+    print("EPOCH: {} \
+           TRAIN_LOSS: {} \
+           TRAIN IoU {} \
+           VAL LOSS: {} \
+           VAL IoU: {} ".format(epoch,
+                                TR_LOSS,
+                                TR_IOU,
+                                VAL_LOSS,
+                                VAL_IOU,
+                            ))
     print('---------------------------')
 
 model_path = "./model_epochs{}_lr{}".format(EPOCHS, LR)
