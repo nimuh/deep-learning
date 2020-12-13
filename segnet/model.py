@@ -9,7 +9,11 @@ import numpy as np
 SegNet model as defined in paper. Consists of 5 encoder layers and 5 decoder layers.
 The decoder layers receive max pooling indices from the encoder. The output is an image
 with the number of channels equal to the number of classes we are predicting.
+
+References: https://github.com/say4n/pytorch-segnet
 """
+
+
 class SegNet(torch.nn.Module):
 
     def __init__(self, input_ch, output_ch):
@@ -59,7 +63,8 @@ class SegNet(torch.nn.Module):
 
 
     """
-    Represents modules in SegNet for convolution/deconvolution
+    Represents modules in SegNet for convolution/deconvolution. Each module has a convolutional
+    layer along with a batch normalization layer.
     """
     def __enc_conv_module(self, in_channels, out_channels, kernel_size, pad):
         module = torch.nn.Sequential(torch.nn.Conv2d(in_channels=in_channels, 
@@ -84,7 +89,8 @@ class SegNet(torch.nn.Module):
 
 
     """
-    Forward pass for inference. The outputs are the logits.
+    Forward pass for inference. The outputs are the logits of the final layer and the 
+    softmax of the output of the final layer.
     """
     def forward(self, x):
         # ENCODER
