@@ -10,24 +10,31 @@ import sys
 import numpy as np
 from sklearn.metrics import jaccard_score as jsc
 
-# TODO
-# MAP RGB VALUES IN MASK TO LABELS SO WE CAN TRAIN
-# Write class that holds class information
-# create method that maps a batch of masks to labels for training
-
-
 IN_CHANNELS = 3
-CLASSES = 6
 gpu = False
 monitor = False
 
-color2label = {(0, 0, 0):      0,
-               (128, 64, 128): 7,
-               (244, 35, 232): 8,
-               (250, 170, 30): 19,
-               (220, 20, 60):  24,
-               (0, 0, 142):    26,
+# dictionary for mapping masks to labels
+color2label = {(0, 0, 0):       0,
+               (111, 74,  0):   5,
+               (81,  0, 81):    6,
+               (128, 64, 128):  7,
+               (244, 35, 232):  8,
+               (250, 170, 160): 9,
+               (230, 150, 140): 10,
+               (70, 70, 70):    11,
+               (102, 102, 156): 12,
+               (190, 153, 153): 13,
+               (180, 165, 180): 14,
+               (150, 100, 100): 15,
+               (150, 120, 90):  16,
+               (153, 153, 153): 17,
+               (250, 170, 30):  19,
+               (220, 220, 0):   20,
+               (0, 0, 142):     21,
               }
+
+CLASSES = 34
 
 labeler = DataLabels(color2label)
 
@@ -37,9 +44,10 @@ if len(sys.argv) > 1 and sys.argv[1] == 'gpu':
 
 if len(sys.argv) == 3 and sys.argv[2] == 'monitor':
     wandb.init(project='segnet')
+    monitor = True
 
-EPOCHS = 500
-LR = 1e-6
+EPOCHS = 100
+LR = 1e-4
 BATCH_SIZE = 16
 print("----INIT TRAIN SCRIPT----")
 print("=========================")
@@ -61,7 +69,7 @@ out_t = transforms.Compose([
             transforms.functional.pil_to_tensor,
         ])
 
-data = Cityscapes('./data', target_type=['color'], transform=in_t, target_transform=out_t)
+data = Cityscapes('./data', target_type=['semantic'], transform=in_t, target_transform=out_t)
 
 train_data = DataLoader(data, batch_size=BATCH_SIZE, shuffle=True)
 
@@ -76,7 +84,8 @@ if monitor:
 
 # optimizer and loss definition
 criterion = torch.nn.CrossEntropyLoss().cuda()
-optimizer = torch.optim.Adam(model.parameters(), lr=LR)
+#optimizer = torch.optim.Adam(model.parameters(), lr=LR)
+optimizer = torch.optim.SGD(model.parameters(), lr=LR, momentum=0.9)
 
 # training
 for epoch in range(EPOCHS):
@@ -84,26 +93,24 @@ for epoch in range(EPOCHS):
     print('-------- EPOCH {} -------'.format(epoch))
     batch_count = 0
     epoch_iou = 0
-    for i, (inputs, targets) in enumerate(train_data, 0):
-
-        labels = labeler.label_batch(targets)
-
+    for i, (inputs, targets) in enumerate(train_data, 0):    
+        labels = targets.squeeze(1).type(torch.int64)
+        
         if gpu:
             inputs = inputs.cuda()
             labels = labels.cuda()
 
         logits, y_pred = model(inputs)
-        
+
         # Compute and print loss
         loss = criterion(logits, labels)
-        """
+
         batch_iou = jsc(
-            y.cpu().numpy().reshape(-1),
+            labels.cpu().numpy().reshape(-1),
             torch.argmax(y_pred, dim=1).cpu().numpy().reshape(-1),
             average='macro',
         )
         epoch_iou += batch_iou
-        """
         
         batch_count += 1
         epoch_loss += loss.item()
@@ -119,7 +126,7 @@ for epoch in range(EPOCHS):
                     })
 
         loss.backward()
-        optimizer.step
+        optimizer.step()
 
     print('---------------------------')
     print("EPOCH: {} LOSS: {} IoU: {}".format(epoch, epoch_loss / batch_count, epoch_iou / batch_count))
@@ -128,5 +135,4 @@ for epoch in range(EPOCHS):
 model_path = "./model_epochs{}_lr{}".format(EPOCHS, LR)
 print("Saving Model...")
 torch.save(model, model_path)
-#torch.load(model_path)
     
