@@ -7,7 +7,7 @@ import numpy as np
 
 """
 SegNet model as defined in paper. Consists of 5 encoder layers and 5 decoder layers.
-The decoder layers receive max poolingn indices from the encoder. The output is an image
+The decoder layers receive max pooling indices from the encoder. The output is an image
 with the number of channels equal to the number of classes we are predicting.
 """
 class SegNet(torch.nn.Module):

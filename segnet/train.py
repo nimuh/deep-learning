@@ -59,16 +59,9 @@ v_data = Cityscapes('./data',
                      transform=in_t, 
                      target_transform=out_t,
                     )
-#te_data = Cityscapes('./data', 
- #                    target_type=['semantic'], 
-  #                   split='test', 
-   #                  transform=in_t, 
-    #                 target_transform=out_t,
-     #               )
 
 train_data = DataLoader(tr_data, batch_size=BATCH_SIZE, shuffle=True)
 val_data = DataLoader(v_data, batch_size=BATCH_SIZE, shuffle=False)
-#test_data = DataLoader(te_data, batch_size=BATCH_SIZE, shuffle=False)
 
 # define model
 model = SegNet(IN_CHANNELS, CLASSES)
