@@ -6,3 +6,4 @@ A repository containing implementations of deep learning models and my experimen
 - Segmentation Survey for Monocular Visual Odometry: https://drive.google.com/file/d/1PEhD_UBlzgvFV2HVd9tHyDKFjhN9tilp/view?usp=sharing 
 -- Source code in segnet folder.
 
+- Language Models as Image Autoencoders (Ongoing)
